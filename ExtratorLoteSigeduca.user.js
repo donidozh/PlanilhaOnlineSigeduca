@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Envio para Planilha Online - Lote
 // @namespace    http://tampermonkey.net/
-// @version      2.1
-// @description  Envio das turmas para planilha online, em lote.
+// @version      2.2
+// @description  Envio das turmas para planilha online em lote.
 // @author       Elder Martins
 // @match        *://sigeduca.seduc.mt.gov.br/ged/hwmgrhturma.aspx*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js
@@ -12,8 +12,24 @@
 (function() {
     'use strict';
 
+    // --- AUTO-CONFIGURAÇÃO INTELIGENTE DA ESCOLA ---
     let urlWebapp = localStorage.getItem('sigeduca_url_webapp') || "";
     let urlPlanilha = localStorage.getItem('sigeduca_url_planilha') || "";
+
+    let isEscola11606 = false;
+    let elLot = document.getElementById('span_vGRHLOTCOD') || document.getElementById('vGRHLOTCOD');
+    if (elLot) {
+        let val = elLot.innerText ? elLot.innerText.trim() : elLot.value;
+        if (val === "11606") isEscola11606 = true;
+    } else if (document.body.innerText.includes('11606')) {
+        isEscola11606 = true;
+    }
+
+    if (isEscola11606) {
+        urlWebapp = "https://script.google.com/macros/s/AKfycbyVZFSg8wpbqJv8E0R-4NpzYg2V8A_LjfdWoBankKBeKb7n-xn3bnZPnp7xBpBOzCyV/exec";
+        urlPlanilha = "https://docs.google.com/spreadsheets/d/1DqPL6ZVVyD-RIL1Mhg8XXkZ4icneuwHoq_LTbAkKfRc/edit";
+    }
+    // -----------------------------------------------
 
     const pdfjsLib = window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -44,7 +60,6 @@
         trilho.id = 'trilho-slider-lote';
         trilho.style = "display: flex; width: 680px; transition: transform 0.3s ease-in-out;";
 
-        // --- TELA PRINCIPAL (Lado Esquerdo) ---
         const telaPrincipal = document.createElement('div');
         telaPrincipal.style = "width: 340px; padding: 15px; box-sizing: border-box; position: relative;";
         telaPrincipal.innerHTML = `
@@ -61,7 +76,6 @@
             <div id="log-lote" style="margin-top: 15px; font-size: 10px; color: #28a745; max-height: 150px; overflow-y: auto; border-top: 1px solid #ddd; padding-top: 5px; font-family: monospace;"></div>
         `;
 
-        // --- TELA DE CONFIGURAÇÕES (Lado Direito) ---
         const telaConfig = document.createElement('div');
         telaConfig.style = "width: 340px; padding: 15px; box-sizing: border-box; position: relative; background: #ececec;";
         telaConfig.innerHTML = `
@@ -84,12 +98,11 @@
         painel.appendChild(trilho);
         document.body.appendChild(painel);
 
-        // --- EVENTOS DA INTERFACE ---
         document.getElementById('btn-engrenagem-lote').onclick = () => { trilho.style.transform = "translateX(-340px)"; };
         document.getElementById('btn-voltar-lote').onclick = () => { trilho.style.transform = "translateX(0)"; };
 
         document.getElementById('btn-abrir-planilha-lote').onclick = () => {
-            if (!urlPlanilha) return alert("Nenhum link de planilha configurado na engrenagem.");
+            if (!urlPlanilha) return alert("Nenhum link de planilha configurado.");
             window.open(urlPlanilha, '_blank');
         };
 
@@ -99,7 +112,6 @@
 
             localStorage.setItem('sigeduca_url_webapp', novoWebapp);
             localStorage.setItem('sigeduca_url_planilha', novaPlanilha);
-
             urlWebapp = novoWebapp;
             urlPlanilha = novaPlanilha;
 
@@ -214,16 +226,12 @@
     function baixarExtrairTextoPDF(url) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
-                method: "GET",
-                url: url,
-                responseType: "arraybuffer",
+                method: "GET", url: url, responseType: "arraybuffer",
                 onload: async function(response) {
                     try {
                         const data = new Uint8Array(response.response);
                         const isHTML = String.fromCharCode.apply(null, data.subarray(0, 10)).includes('<!DOCTYPE') || String.fromCharCode.apply(null, data.subarray(0, 5)).includes('<html');
-                        if (isHTML) {
-                            return reject("O Genexus retornou HTML ao invés de PDF.");
-                        }
+                        if (isHTML) return reject("O Genexus retornou HTML ao invés de PDF.");
 
                         const loadingTask = pdfjsLib.getDocument({data});
                         const pdf = await loadingTask.promise;
