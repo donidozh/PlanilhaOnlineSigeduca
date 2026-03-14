@@ -49,7 +49,7 @@
         telaPrincipal.innerHTML = `
             <div id="btn-engrenagem-lote" style="position: absolute; top: 12px; right: 15px; cursor: pointer; font-size: 18px;" title="Configurações">⚙️</div>
             <h4 style="margin: 0 0 10px 0; color: #17a2b8; font-size: 15px; text-align: center;">Enviar para Planilha Online em Lote</h4>
-            <p style="font-size: 11px; color: #555; text-align: center; margin-bottom: 15px;">Filtre as turmas no Sigeduca e clique em Consultar. O robô irá rastrear os links na tela.</p>
+            <p style="font-size: 11px; color: #555; text-align: center; margin-bottom: 15px;">Filtre as turmas por Todos no Sigeduca e clique em Consultar. O script irá rastrear os links na tela.</p>
 
             <button id="btn-mapear" style="width: 100%; padding: 8px; margin-bottom: 10px; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">1. Mapear Turmas na Tela</button>
             <div id="status-mapeamento" style="font-size: 12px; font-weight: bold; color: #333; text-align: center; margin-bottom: 10px; min-height: 15px;"></div>
