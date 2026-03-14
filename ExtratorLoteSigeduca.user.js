@@ -2,7 +2,7 @@
 // @name         Envio para Planilha Online - Lote
 // @namespace    http://tampermonkey.net/
 // @version      2.2
-// @description  Envio das turmas para planilha online em lote.
+// @description  Envio das turmas para planilha online em lote com auto-configuração.
 // @author       Elder Martins
 // @match        *://sigeduca.seduc.mt.gov.br/ged/hwmgrhturma.aspx*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js
@@ -12,24 +12,8 @@
 (function() {
     'use strict';
 
-    // --- AUTO-CONFIGURAÇÃO INTELIGENTE DA ESCOLA ---
     let urlWebapp = localStorage.getItem('sigeduca_url_webapp') || "";
     let urlPlanilha = localStorage.getItem('sigeduca_url_planilha') || "";
-
-    let isEscola11606 = false;
-    let elLot = document.getElementById('span_vGRHLOTCOD') || document.getElementById('vGRHLOTCOD');
-    if (elLot) {
-        let val = elLot.innerText ? elLot.innerText.trim() : elLot.value;
-        if (val === "11606") isEscola11606 = true;
-    } else if (document.body.innerText.includes('11606')) {
-        isEscola11606 = true;
-    }
-
-    if (isEscola11606) {
-        urlWebapp = "https://script.google.com/macros/s/AKfycbyVZFSg8wpbqJv8E0R-4NpzYg2V8A_LjfdWoBankKBeKb7n-xn3bnZPnp7xBpBOzCyV/exec";
-        urlPlanilha = "https://docs.google.com/spreadsheets/d/1DqPL6ZVVyD-RIL1Mhg8XXkZ4icneuwHoq_LTbAkKfRc/edit";
-    }
-    // -----------------------------------------------
 
     const pdfjsLib = window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
