@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Relação de Alunos e Planilha Online - Por Turma
 // @namespace    http://tampermonkey.net/
-// @version      3.8
-// @description  Impressão de lista manual e envio de Planilha Online
-// @author       Elder Martins
+// @version      4.0
+// @description  Impressão de lista manual (Design Limpo, Nomes Curtos na Situação)
+// @author       Elder Martins / Assistente
 // @match        *://sigeduca.seduc.mt.gov.br/ged/arralunossituacao.aspx*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js
 // @grant        GM_xmlhttpRequest
@@ -64,7 +64,7 @@
             </h4>
 
             <select id="acao-sigeduca" style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
-                <option value="gerar_tela_impressao">🖨️ Gerar Lista Manual</option>
+                <option value="gerar_tela_impressao">🖨️ Gerar Tela de Impressão</option>
                 <option value="enviar_sheets">🚀 Enviar para Planilha Online</option>
                 <option value="copiar_codigos">📋 Copiar Apenas Códigos</option>
                 <option value="copiar_excel">📊 Copiar para Excel</option>
@@ -235,7 +235,6 @@
             resetarBotao(btn);
         }
         else if (acao === 'copiar_excel') {
-            // Colunas invertidas também na exportação para o Excel
             let tsv = "CÓDIGO\tNOME DO ALUNO\tSITUAÇÃO 2026\tDATA AJUSTE\tDATA MATRÍCULA\tALUNO PAED\tMATRÍCULA PAED\tTRANSPORTE\n";
             alunosExtraidos.forEach(a => { tsv += `${a.codigo}\t${a.nome}\t${a.situacao}\t${a.dataAjuste}\t${a.dataMatricula}\t${a.alunoPaed}\t${a.matPaed}\t${a.transporte}\n`; });
             GM_setClipboard(tsv);
@@ -285,7 +284,16 @@
 
         // Laço principal apenas com os alunos filtrados
         alunosFiltrados.forEach((aluno, index) => {
-            let situacaoExibicao = aluno.situacao.toUpperCase() === "MATRICULADO" ? "&nbsp;" : aluno.situacao;
+            let situacaoExibicao = aluno.situacao.toUpperCase();
+
+            // Tratamento das nomenclaturas para impressão
+            if (situacaoExibicao === "MATRICULADO") {
+                situacaoExibicao = "&nbsp;";
+            } else if (situacaoExibicao === "TRANSFERIDO DA ESCOLA") {
+                situacaoExibicao = "TRANSF.";
+            } else if (situacaoExibicao === "TRANSFERIDO DA TURMA") {
+                situacaoExibicao = "REMOV.";
+            }
 
             linhasTabela += `
                 <tr>
@@ -337,10 +345,22 @@
                     .cabecalho-impr .subtitulo { font-size: 10pt; text-transform: uppercase; color: #333; }
                     .cabecalho-impr .subtitulo b { color: #000; font-weight: bold; }
 
-                    /* Ajustes para condensar: fonte 7pt e padding menor */
-                    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 7pt; }
-                    th, td { border: 1px solid #000; padding: 3px 2px; text-transform: uppercase; }
-                    th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+                    /* Ajustes para condensar: fonte 7pt e controle da borda externa */
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 7pt; border: 1px solid #000; }
+
+                    /* Cabeçalho: somente linhas horizontais (sem verticais internas) */
+                    th { border: none; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 2px; text-transform: uppercase; background-color: #f2f2f2; font-weight: bold; text-align: center; }
+
+                    /* Mantém a borda externa esquerda e direita da tabela no cabeçalho */
+                    th:first-child { border-left: 1px solid #000; }
+                    th:last-child { border-right: 1px solid #000; }
+
+                    /* Linhas normais: somente linhas horizontais */
+                    td { border: none; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 2px; text-transform: uppercase; }
+
+                    /* MÁGICA AQUI: Apenas as colunas 1 (Nº) e 2 (Código) recebem as linhas verticais para fechar o "quadrado" */
+                    tbody td:nth-child(1), tbody td:nth-child(2) { border-left: 1px solid #000; border-right: 1px solid #000; }
+
                     td.centro { text-align: center; }
 
                     /* Oculta botões e ajusta a margem na hora de imprimir */
