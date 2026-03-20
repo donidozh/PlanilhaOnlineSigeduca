@@ -2,8 +2,8 @@
 // @name         Relação de Alunos e Planilha Online - Por Turma
 // @namespace    http://tampermonkey.net/
 // @version      4.0
-// @description  Impressão de lista manual (Design Limpo, Nomes Curtos na Situação)
-// @author       Elder Martins / Assistente
+// @description  Impressão de lista manual e envio para Planilha Online
+// @author       Elder Martins
 // @match        *://sigeduca.seduc.mt.gov.br/ged/arralunossituacao.aspx*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js
 // @grant        GM_xmlhttpRequest
@@ -307,8 +307,8 @@
             `;
         });
 
-        // 58 linhas para fechar perfeitamente a A4
-        const linhasPorPagina = 58;
+        // 55 linhas para fechar a A4
+        const linhasPorPagina = 55;
         let linhasRestantes = linhasPorPagina - (alunosFiltrados.length % linhasPorPagina);
 
         // Garante no mínimo 5 linhas se bater muito perto do final da página
