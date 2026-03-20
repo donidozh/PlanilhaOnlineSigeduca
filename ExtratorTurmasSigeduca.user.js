@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Envio de Planilha Online - Por Turma
+// @name         Relação de Alunos e Planilha Online - Por Turma
 // @namespace    http://tampermonkey.net/
-// @version      3.2
-// @description  Envio das turmas para planilha online
+// @version      3.6
+// @description  Impressão de lista manual e envio de Planilha Online
 // @author       Elder Martins
 // @match        *://sigeduca.seduc.mt.gov.br/ged/arralunossituacao.aspx*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js
@@ -64,6 +64,7 @@
             </h4>
 
             <select id="acao-sigeduca" style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                <option value="gerar_tela_impressao">🖨️ Gerar Tela de Impressão</option>
                 <option value="enviar_sheets">🚀 Enviar para Planilha Online</option>
                 <option value="copiar_codigos">📋 Copiar Apenas Códigos</option>
                 <option value="copiar_excel">📊 Copiar para Excel</option>
@@ -213,7 +214,8 @@
 
             alunosExtraidos.push({
                 codigo: match[2], nome: nome, situacao: situacao2026,
-                dataMatricula: match[4], dataAjuste: (match[3].replace(/\s/g, '') === "//") ? "//" : match[3],
+                dataMatricula: match[4],
+                dataAjuste: (match[3].replace(/\s/g, '') === "//" || match[3].trim() === "") ? "" : match[3],
                 alunoPaed: match[5], matPaed: match[6], transporte: match[7]
             });
         }
@@ -239,6 +241,10 @@
             alert(`Sucesso! ${alunosExtraidos.length} registros copiados.`);
             resetarBotao(btn);
         }
+        else if (acao === 'gerar_tela_impressao') {
+            gerarTelaImpressao(alunosExtraidos, nomeTurma, turnoTurma);
+            resetarBotao(btn);
+        }
         else if (acao === 'enviar_sheets') {
             if (!urlWebapp) {
                 alert("Link não configurado! Clique na engrenagem ⚙️.");
@@ -262,6 +268,109 @@
                 }
             });
         }
+    }
+
+    function gerarTelaImpressao(alunos, turma, turno) {
+        const novaJanela = window.open('', '_blank');
+        if (!novaJanela) {
+            alert("O navegador bloqueou a nova aba. Por favor, permita pop-ups para este site.");
+            return;
+        }
+
+        let linhasTabela = "";
+
+        // Filtrar alunos: Remove quem tem a palavra DEPENDENTE na situação
+        const alunosFiltrados = alunos.filter(a => !a.situacao.toUpperCase().includes("DEPENDENTE"));
+
+        // Laço principal apenas com os alunos filtrados
+        alunosFiltrados.forEach((aluno, index) => {
+            // Se a situação for exatamente MATRICULADO, deixamos o campo em branco (&nbsp;)
+            let situacaoExibicao = aluno.situacao.toUpperCase() === "MATRICULADO" ? "&nbsp;" : aluno.situacao;
+
+            linhasTabela += `
+                <tr>
+                    <td class="centro">${index + 1}</td>
+                    <td class="centro">${aluno.codigo}</td>
+                    <td>${aluno.nome}</td>
+                    <td class="centro">${situacaoExibicao}</td>
+                    <td class="centro">${aluno.dataMatricula}</td>
+                    <td class="centro">${aluno.dataAjuste}</td>
+                </tr>
+            `;
+        });
+
+        // Laço extra para gerar 5 linhas em branco
+        for (let i = 1; i <= 5; i++) {
+            linhasTabela += `
+                <tr>
+                    <td class="centro">${alunosFiltrados.length + i}</td>
+                    <td class="centro">&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td class="centro">&nbsp;</td>
+                    <td class="centro">&nbsp;</td>
+                    <td class="centro">&nbsp;</td>
+                </tr>
+            `;
+        }
+
+        const htmlRelatorio = `
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+                <meta charset="UTF-8">
+                <title>Relatório - ${turma}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 15px; color: #333; }
+                    h2 { text-align: center; margin-bottom: 2px; text-transform: uppercase; font-size: 14pt; }
+                    h4 { text-align: center; margin-top: 0; color: #555; font-weight: normal; font-size: 10pt; }
+
+                    /* Ajustes para condensar: fonte 7pt e padding menor */
+                    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 7pt; }
+                    th, td { border: 1px solid #000; padding: 3px 2px; text-transform: uppercase; }
+                    th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+                    td.centro { text-align: center; }
+
+                    /* Oculta botões e ajusta a margem na hora de imprimir */
+                    @media print {
+                        .no-print { display: none !important; }
+                        body { padding: 0; }
+                    }
+
+                    .btn-imprimir {
+                        display: block; width: 200px; margin: 15px auto; padding: 10px;
+                        background: #007bff; color: white; text-align: center;
+                        font-weight: bold; border-radius: 5px; cursor: pointer; border: none; font-size: 12px;
+                    }
+                    .btn-imprimir:hover { background: #0056b3; }
+                </style>
+            </head>
+            <body>
+                <button class="btn-imprimir no-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+
+                <h2>Relação de Alunos por Situação</h2>
+                <h4>Turma: <b>${turma}</b> | Turno: <b>${turno}</b></h4>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 4%;">Nº</th>
+                            <th style="width: 14%;">CÓDIGO</th>
+                            <th style="width: 38%;">NOME DO ALUNO</th>
+                            <th style="width: 20%;">SITUAÇÃO</th>
+                            <th style="width: 12%;">DT MATRÍCULA</th>
+                            <th style="width: 12%;">DT AJUSTE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${linhasTabela}
+                    </tbody>
+                </table>
+            </body>
+            </html>
+        `;
+
+        novaJanela.document.write(htmlRelatorio);
+        novaJanela.document.close();
     }
 
     function resetarBotao(btn) {
