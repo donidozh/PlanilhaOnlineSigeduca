@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Relação de Alunos e Planilha Online - Por Turma
 // @namespace    http://tampermonkey.net/
-// @version      3.6
+// @version      3.8
 // @description  Impressão de lista manual e envio de Planilha Online
 // @author       Elder Martins
 // @match        *://sigeduca.seduc.mt.gov.br/ged/arralunossituacao.aspx*
@@ -13,7 +13,7 @@
 (function() {
     'use strict';
 
-    // --- AUTO-CONFIGURAÇÃO INTELIGENTE DA ESCOLA ---
+    // CONFIGURAR WEB APP E LINK DA PLANILHA
     let urlWebapp = localStorage.getItem('sigeduca_url_webapp') || "";
     let urlPlanilha = localStorage.getItem('sigeduca_url_planilha') || "";
 
@@ -64,7 +64,7 @@
             </h4>
 
             <select id="acao-sigeduca" style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
-                <option value="gerar_tela_impressao">🖨️ Gerar Tela de Impressão</option>
+                <option value="gerar_tela_impressao">🖨️ Gerar Lista Manual</option>
                 <option value="enviar_sheets">🚀 Enviar para Planilha Online</option>
                 <option value="copiar_codigos">📋 Copiar Apenas Códigos</option>
                 <option value="copiar_excel">📊 Copiar para Excel</option>
@@ -235,8 +235,9 @@
             resetarBotao(btn);
         }
         else if (acao === 'copiar_excel') {
-            let tsv = "CÓDIGO\tNOME DO ALUNO\tSITUAÇÃO 2026\tDATA MATRÍCULA\tDATA AJUSTE\tALUNO PAED\tMATRÍCULA PAED\tTRANSPORTE\n";
-            alunosExtraidos.forEach(a => { tsv += `${a.codigo}\t${a.nome}\t${a.situacao}\t${a.dataMatricula}\t${a.dataAjuste}\t${a.alunoPaed}\t${a.matPaed}\t${a.transporte}\n`; });
+            // Colunas invertidas também na exportação para o Excel
+            let tsv = "CÓDIGO\tNOME DO ALUNO\tSITUAÇÃO 2026\tDATA AJUSTE\tDATA MATRÍCULA\tALUNO PAED\tMATRÍCULA PAED\tTRANSPORTE\n";
+            alunosExtraidos.forEach(a => { tsv += `${a.codigo}\t${a.nome}\t${a.situacao}\t${a.dataAjuste}\t${a.dataMatricula}\t${a.alunoPaed}\t${a.matPaed}\t${a.transporte}\n`; });
             GM_setClipboard(tsv);
             alert(`Sucesso! ${alunosExtraidos.length} registros copiados.`);
             resetarBotao(btn);
@@ -284,7 +285,6 @@
 
         // Laço principal apenas com os alunos filtrados
         alunosFiltrados.forEach((aluno, index) => {
-            // Se a situação for exatamente MATRICULADO, deixamos o campo em branco (&nbsp;)
             let situacaoExibicao = aluno.situacao.toUpperCase() === "MATRICULADO" ? "&nbsp;" : aluno.situacao;
 
             linhasTabela += `
@@ -293,14 +293,23 @@
                     <td class="centro">${aluno.codigo}</td>
                     <td>${aluno.nome}</td>
                     <td class="centro">${situacaoExibicao}</td>
-                    <td class="centro">${aluno.dataMatricula}</td>
                     <td class="centro">${aluno.dataAjuste}</td>
+                    <td class="centro">${aluno.dataMatricula}</td>
                 </tr>
             `;
         });
 
-        // Laço extra para gerar 5 linhas em branco
-        for (let i = 1; i <= 5; i++) {
+        // 58 linhas para fechar perfeitamente a A4
+        const linhasPorPagina = 58;
+        let linhasRestantes = linhasPorPagina - (alunosFiltrados.length % linhasPorPagina);
+
+        // Garante no mínimo 5 linhas se bater muito perto do final da página
+        if (linhasRestantes < 5) {
+             linhasRestantes += linhasPorPagina;
+        }
+
+        // Laço extra para gerar as linhas em branco até o fim da página
+        for (let i = 1; i <= linhasRestantes; i++) {
             linhasTabela += `
                 <tr>
                     <td class="centro">${alunosFiltrados.length + i}</td>
@@ -320,12 +329,16 @@
                 <meta charset="UTF-8">
                 <title>Relatório - ${turma}</title>
                 <style>
-                    body { font-family: Arial, sans-serif; padding: 15px; color: #333; }
-                    h2 { text-align: center; margin-bottom: 2px; text-transform: uppercase; font-size: 14pt; }
-                    h4 { text-align: center; margin-top: 0; color: #555; font-weight: normal; font-size: 10pt; }
+                    body { font-family: Arial, sans-serif; padding: 15px; color: #333; margin: 0; }
+
+                    /* Cabeçalho com fonte 10pt e bolds ajustados */
+                    .cabecalho-impr { text-align: center; margin-bottom: 5px; }
+                    .cabecalho-impr .titulo { font-size: 10pt; text-transform: uppercase; font-weight: bold; color: #333; }
+                    .cabecalho-impr .subtitulo { font-size: 10pt; text-transform: uppercase; color: #333; }
+                    .cabecalho-impr .subtitulo b { color: #000; font-weight: bold; }
 
                     /* Ajustes para condensar: fonte 7pt e padding menor */
-                    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 7pt; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 7pt; }
                     th, td { border: 1px solid #000; padding: 3px 2px; text-transform: uppercase; }
                     th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
                     td.centro { text-align: center; }
@@ -347,8 +360,10 @@
             <body>
                 <button class="btn-imprimir no-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
 
-                <h2>Relação de Alunos por Situação</h2>
-                <h4>Turma: <b>${turma}</b> | Turno: <b>${turno}</b></h4>
+                <div class="cabecalho-impr">
+                    <div class="titulo">RELAÇÃO DE ALUNOS POR SITUAÇÃO</div>
+                    <div class="subtitulo">Turma: <b>${turma}</b> &nbsp;|&nbsp; Turno: <b>${turno}</b></div>
+                </div>
 
                 <table>
                     <thead>
@@ -357,8 +372,8 @@
                             <th style="width: 14%;">CÓDIGO</th>
                             <th style="width: 38%;">NOME DO ALUNO</th>
                             <th style="width: 20%;">SITUAÇÃO</th>
-                            <th style="width: 12%;">DT MATRÍCULA</th>
                             <th style="width: 12%;">DT AJUSTE</th>
+                            <th style="width: 12%;">DT MATRÍCULA</th>
                         </tr>
                     </thead>
                     <tbody>
