@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         Drive de Ocorrências SIGEDUCA
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Consulta e inserção de ocorrências com extração automática em background. Integrado com localStorage.
 // @match        *://sigeduca.seduc.mt.gov.br/ged/*
 // @run-at       document-start
+// @updateURL    https://github.com/donidozh/PlanilhaOnlineSigeduca/raw/refs/heads/main/DriveOcorrencias.user.js
+// @downloadURL  https://github.com/donidozh/PlanilhaOnlineSigeduca/raw/refs/heads/main/DriveOcorrencias.user.js
 // @grant        none
 // ==/UserScript==
 
@@ -112,11 +114,14 @@
         if (btnOriginal) {
             btnOriginal.style.display = 'none';
 
+            // Botão Consultar
             const btnConsultar = document.createElement('input');
             btnConsultar.type = 'button';
             btnConsultar.value = 'Consultar Histórico';
             btnConsultar.name = 'BCONSULTAR_OCO';
             btnConsultar.className = btnOriginal.className;
+            btnConsultar.style.width = "auto";
+            btnConsultar.style.padding = "2px 15px";
 
             btnConsultar.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -125,12 +130,15 @@
                 acionarConsulta();
             });
 
+            // Botão Incluir
             const btnIncluir = document.createElement('input');
             btnIncluir.type = 'button';
             btnIncluir.value = 'Incluir Ocorrência';
             btnIncluir.name = 'BINCLUIR_OCO';
             btnIncluir.className = btnOriginal.className;
-            btnIncluir.style.marginLeft = "15px";
+            btnIncluir.style.marginLeft = "10px";
+            btnIncluir.style.width = "auto"; // Garante que o texto não corte
+            btnIncluir.style.padding = "2px 15px"; // Dá um espaçamento interno
 
             btnIncluir.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -139,15 +147,31 @@
                 acionarInclusao();
             });
 
+            // Botão Imprimir
+            const btnImprimir = document.createElement('input');
+            btnImprimir.type = 'button';
+            btnImprimir.value = 'Imprimir Ficha';
+            btnImprimir.name = 'BIMPRIMIR_OCO';
+            btnImprimir.className = btnOriginal.className;
+            btnImprimir.style.marginLeft = "10px";
+            btnImprimir.style.width = "auto";
+            btnImprimir.style.padding = "2px 15px";
+
+            btnImprimir.addEventListener('click', (e) => {
+                e.preventDefault();
+                imprimirOcorrencias();
+            });
+
             const parent = btnOriginal.parentNode;
             parent.insertBefore(btnConsultar, btnOriginal);
             parent.insertBefore(btnIncluir, btnOriginal);
+            parent.insertBefore(btnImprimir, btnOriginal);
         }
     }
 
 
     // =========================================================================
-    // 3. CAPTURA DE DADOS E LÓGICA DO MODAL
+    // 3. CAPTURA DE DADOS E LÓGICA DO MODAL E IMPRESSÃO
     // =========================================================================
 
     function obterUsuarioLogado() {
@@ -337,6 +361,63 @@
         document.getElementById('btnSalvarOcorrencia').addEventListener('click', () => {
             salvarOcorrencia(dados);
         });
+    }
+
+    function imprimirOcorrencias() {
+        const codAluno = document.getElementById('vGEDALUCOD')?.value || '';
+        const nomeAluno = document.getElementById('span_vGEDALUNOM')?.innerText || 'Aluno não identificado';
+        const container = document.getElementById('containerResultadosOcorrencias');
+
+        if(!codAluno || codAluno === "0") {
+            alert("⚠️ Selecione um aluno clicando na lupa antes de imprimir.");
+            return;
+        }
+
+        if (!container || container.innerHTML.trim() === '') {
+            alert("⚠️ Consulte o histórico de ocorrências primeiro clicando em 'Consultar Histórico'.");
+            return;
+        }
+
+        // Abre uma nova janela para montar o layout de impressão limpo
+        const janela = window.open('', '', 'width=900,height=600');
+        
+        janela.document.write(`
+            <html>
+                <head>
+                    <title>Ficha de Ocorrências - ${nomeAluno}</title>
+                    <style>
+                        body { font-family: Verdana, sans-serif; padding: 20px; color: #333; }
+                        h2 { text-align: center; border-bottom: 2px solid #065195; padding-bottom: 10px; color: #065195; }
+                        .info-aluno { margin-bottom: 20px; font-size: 14px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+                        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+                        th { background-color: #f5f5f5; text-align: center !important; }
+                        td { vertical-align: top; }
+                        /* Ignora a formatação fieldset do genexus que foi injetada */
+                        fieldset { border: none; padding: 0; margin: 0; }
+                        legend { display: none; }
+                        @media print {
+                            body { -webkit-print-color-adjust: exact; }
+                            button { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h2>Ficha Histórica de Ocorrências</h2>
+                    <div class="info-aluno">
+                        <strong>Código:</strong> ${codAluno} <br>
+                        <strong>Aluno:</strong> ${nomeAluno}
+                    </div>
+                    ${container.innerHTML}
+                    <div style="text-align: center; margin-top: 30px;">
+                        <button onclick="window.print()" style="padding: 10px 20px; font-size: 14px; cursor: pointer;">🖨️ Imprimir Agora</button>
+                    </div>
+                </body>
+            </html>
+        `);
+        
+        janela.document.close();
+        janela.focus();
     }
 
 
