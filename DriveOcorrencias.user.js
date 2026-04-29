@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Drive de Ocorrências SIGEDUCA
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Consulta e inserção de ocorrências com extração automática em background. Integrado com localStorage.
 // @match        *://sigeduca.seduc.mt.gov.br/ged/*
 // @run-at       document-start
@@ -14,7 +14,7 @@
     // =========================================================================
     // CONFIGURAÇÃO DA PLANILHA (Sincronizado via localStorage)
     // =========================================================================
-    const urlWebAppPadrao = 'https://script.google.com/macros/s/AKfycbx8xmXIi9euecmM9d2zfwp7YqccXsje4fBKLYctLf_abxWlECYud0x_d_SeuXbGmEY-/exec';
+    const urlWebAppPadrao = 'https://script.google.com/macros/s/AKfycbx91jubEBv2kPqpIoVQkHvGsb8u4haCvjLh_ir94yOE78ZpmSnv-srfOSXnSYRwDLge/exec';
     const urlPlanilhaPadrao = 'https://docs.google.com/spreadsheets/d/1DqPL6ZVVyD-RIL1Mhg8XXkZ4icneuwHoq_LTbAkKfRc/';
 
     // Puxa do localStorage ou usa o padrão
