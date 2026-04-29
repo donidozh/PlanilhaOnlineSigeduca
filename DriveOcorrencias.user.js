@@ -14,8 +14,8 @@
     // =========================================================================
     // CONFIGURAÇÃO DA PLANILHA (Sincronizado via localStorage)
     // =========================================================================
-    const urlWebAppPadrao = '';
-    const urlPlanilhaPadrao = '';
+    const urlWebAppPadrao = 'https://script.google.com/macros/s/AKfycbx-TZ9BZrzU770JkreofHHwMJ6swjJiz6HvxBPvoKy2iqkbcj_fhmZXngEf5CplSKE5/exec';
+    const urlPlanilhaPadrao = 'https://docs.google.com/spreadsheets/d/1DqPL6ZVVyD-RIL1Mhg8XXkZ4icneuwHoq_LTbAkKfRc/';
 
     // Puxa do localStorage ou usa o padrão
     let GAS_URL = localStorage.getItem('sigeduca_url_webapp') || urlWebAppPadrao;
