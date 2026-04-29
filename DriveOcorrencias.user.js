@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Drive de Ocorrências SIGEDUCA
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Consulta e inserção de ocorrências com extração automática em background (Grid Oculto).
+// @version      1.1
+// @description  Consulta e inserção de ocorrências com extração automática em background. Integrado com localStorage.
 // @match        *://sigeduca.seduc.mt.gov.br/ged/*
 // @run-at       document-start
 // @grant        none
@@ -12,9 +12,14 @@
     'use strict';
 
     // =========================================================================
-    // CONFIGURAÇÃO DA PLANILHA (Substitua pela URL do seu Web App)
+    // CONFIGURAÇÃO DA PLANILHA (Sincronizado via localStorage)
     // =========================================================================
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyRK90uDaiIbI4j8tBEu8CwxsYKv9GSjsjWeQxcIDQ8rmWwf6FOPQ7PAPgJGbyDxa5C/exec';
+    const urlWebAppPadrao = '';
+    const urlPlanilhaPadrao = '';
+
+    // Puxa do localStorage ou usa o padrão
+    let GAS_URL = localStorage.getItem('sigeduca_url_webapp') || urlWebAppPadrao;
+    let URL_PLANILHA = localStorage.getItem('sigeduca_url_planilha') || urlPlanilhaPadrao;
 
     // =========================================================================
     // 1. INTERCEPTADOR DO MENU GENEXUS
@@ -63,7 +68,6 @@
         }
     });
 
-    // Força a ocultação da tabela nativa de matrículas para não poluir a tela
     function injetarCSS() {
         const style = document.createElement('style');
         style.innerHTML = `
@@ -83,7 +87,6 @@
         setTitles();
         setTimeout(setTitles, 500);
 
-        // Oculta os campos nativos desnecessários
         const camposParaOcultar = [
             'TBESCOLA', 'TBMUNICIPIO', 'vGERANOLETCOD', 'vGEDALUIDINEP', 'TBDATANASCIMENTO', 'TBNOMEMAE'
         ];
@@ -96,7 +99,6 @@
             }
         });
 
-        // Cria nossa área de resultados
         const containerPrincipal = document.querySelector('.Section');
         if (containerPrincipal) {
             const divResultados = document.createElement('div');
@@ -108,7 +110,6 @@
 
         const btnOriginal = document.querySelector('input[name="BCONSULTAR"]');
         if (btnOriginal) {
-            // Oculta o botão de consulta original da Genexus, mas mantém ele no DOM para podermos clicar via script
             btnOriginal.style.display = 'none';
 
             const btnConsultar = document.createElement('input');
@@ -119,6 +120,8 @@
 
             btnConsultar.addEventListener('click', (e) => {
                 e.preventDefault();
+                // Atualiza a URL caso tenha sido alterada em outra aba recentemente
+                GAS_URL = localStorage.getItem('sigeduca_url_webapp') || urlWebAppPadrao;
                 acionarConsulta();
             });
 
@@ -131,6 +134,8 @@
 
             btnIncluir.addEventListener('click', (e) => {
                 e.preventDefault();
+                // Atualiza a URL caso tenha sido alterada em outra aba recentemente
+                GAS_URL = localStorage.getItem('sigeduca_url_webapp') || urlWebAppPadrao;
                 acionarInclusao();
             });
 
@@ -142,7 +147,7 @@
 
 
     // =========================================================================
-    // 3. CAPTURA DE DADOS E LÓGICA DO MODAL (Com extração em Background)
+    // 3. CAPTURA DE DADOS E LÓGICA DO MODAL
     // =========================================================================
 
     function obterUsuarioLogado() {
@@ -182,7 +187,6 @@
                 let suffix = match[1];
                 let schoolSpan = document.getElementById(`span_vGERLOTNOMAUX_${suffix}`);
 
-                // Usamos .textContent ao invés de .innerText porque os elementos estão ocultos via CSS
                 if (schoolSpan && schoolSpan.textContent.includes(schoolCode)) {
                     let elTurma = document.getElementById(`span_vGERTURSAL_${suffix}`);
                     let elTurno = document.getElementById(`span_vGERTRNDSC_${suffix}`);
@@ -220,16 +224,13 @@
         const btnIncluir = document.querySelector('input[name="BINCLUIR_OCO"]');
         const btnOriginal = document.querySelector('input[name="BCONSULTAR"]');
 
-        // Altera o visual do botão enquanto carrega as matrículas em background
         btnIncluir.value = "Carregando turma...";
         btnIncluir.disabled = true;
 
-        // Dispara o clique no botão oculto nativo do SigEduca
         if (btnOriginal) btnOriginal.click();
 
-        // Loop de espera (Polling) para aguardar o AJAX da Genexus terminar de montar a tabela oculta
         let tentativas = 0;
-        const maxTentativas = 30; // Limite de 15 segundos (30 * 500ms)
+        const maxTentativas = 30;
 
         const checkInterval = setInterval(() => {
             tentativas++;
@@ -237,15 +238,12 @@
             const ajaxLoader = document.getElementById('gx_ajax_notification');
             const isAjaxLoading = ajaxLoader && ajaxLoader.style.display !== 'none';
 
-            // Se as linhas foram criadas no DOM e o carregamento parou
             if (rows.length > 0 && !isAjaxLoading) {
                 clearInterval(checkInterval);
 
-                // Restaura o botão
                 btnIncluir.value = "Incluir Ocorrência";
                 btnIncluir.disabled = false;
 
-                // Extrai os dados e abre o modal
                 const dados = capturarDadosTela();
                 if (dados.turma === "NÃO IDENTIFICADA") {
                     const confirmacao = confirm("Não identificamos uma matrícula recente para este aluno na nossa unidade. Deseja prosseguir com a ocorrência mesmo assim?");
@@ -271,7 +269,6 @@
         const modalHtml = `
         <div id="modalOcorrenciaBg" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; display:flex; justify-content:center; align-items:center;">
             <div class="Form" style="background:#FFF; padding:0; border:2px solid #065195; border-radius:5px; width:780px; box-shadow: 0px 0px 15px rgba(0,0,0,0.5);">
-
                 <table class="Table" cellpadding="1" cellspacing="2" style="width:100%;">
                     <tbody>
                         <tr>
@@ -357,6 +354,11 @@
             return;
         }
 
+        if (!GAS_URL) {
+            alert("⚠️ URL do Web App não configurada. Verifique suas configurações no outro script.");
+            return;
+        }
+
         const [ano, mes, dia] = dataOcorrencia.split('-');
         const dataFormatada = `${dia}/${mes}/${ano}`;
 
@@ -378,22 +380,32 @@
         fetch(GAS_URL, {
             method: 'POST',
             body: JSON.stringify(payload),
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' } // text/plain evita preflight CORS no Apps Script
         })
-        .then(response => response.json())
+        .then(async response => {
+            // Tratamento aprimorado para descobrir o motivo real da falha
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const text = await response.text();
+            try {
+                return JSON.parse(text); // Tenta converter para JSON
+            } catch (e) {
+                console.error("Resposta do servidor não é JSON:", text);
+                throw new Error("Servidor não retornou JSON. Verifique as permissões do Web App.");
+            }
+        })
         .then(data => {
             if(data.status === 'sucesso') {
                 alert("✅ Ocorrência salva no Drive com sucesso!");
                 document.getElementById('modalOcorrenciaBg').remove();
             } else {
-                alert("❌ Erro ao salvar: " + data.mensagem);
+                alert("❌ Erro ao salvar: " + (data.mensagem || "Erro desconhecido."));
                 btnSalvar.value = "Confirmar";
                 btnSalvar.disabled = false;
             }
         })
         .catch(err => {
-            console.error(err);
-            alert("❌ Erro de conexão com o Google Sheets.");
+            console.error("Erro no Fetch:", err);
+            alert(`❌ Erro de conexão com o Google Sheets:\n${err.message}\nVerifique o console (F12) para mais detalhes.`);
             btnSalvar.value = "Confirmar";
             btnSalvar.disabled = false;
         });
@@ -404,6 +416,11 @@
         const nomeAluno = document.getElementById('span_vGEDALUNOM')?.innerText || '';
         if(!codAluno || codAluno === "0") {
             alert("⚠️ Selecione um aluno clicando na lupa para consultar o histórico.");
+            return;
+        }
+
+        if (!GAS_URL) {
+            alert("⚠️ URL do Web App não configurada. Verifique suas configurações.");
             return;
         }
 
@@ -424,7 +441,16 @@
             body: JSON.stringify(payload),
             headers: { 'Content-Type': 'text/plain;charset=utf-8' }
         })
-        .then(response => response.json())
+        .then(async response => {
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error("Resposta do servidor não é JSON:", text);
+                throw new Error("Servidor não retornou JSON. O Web App pode exigir login.");
+            }
+        })
         .then(data => {
             if(data.status === 'sucesso') {
                 renderizarTabelaOcorrencias(data.ocorrencias, nomeAluno);
@@ -433,8 +459,8 @@
             }
         })
         .catch(err => {
-            console.error(err);
-            container.innerHTML = `<span style="color:red; font-family:Verdana; font-size:12px;">Erro de conexão.</span>`;
+            console.error("Erro no Fetch:", err);
+            container.innerHTML = `<span style="color:red; font-family:Verdana; font-size:12px;">Erro de conexão: ${err.message}</span>`;
         })
         .finally(() => {
             btn.value = "Consultar Histórico";
