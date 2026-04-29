@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Drive de Ocorrências SIGEDUCA
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Consulta e inserção de ocorrências com extração automática em background. Integrado com localStorage.
 // @match        *://sigeduca.seduc.mt.gov.br/ged/*
 // @run-at       document-start
