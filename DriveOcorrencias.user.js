@@ -117,7 +117,7 @@
             // Botão Consultar
             const btnConsultar = document.createElement('input');
             btnConsultar.type = 'button';
-            btnConsultar.value = 'Consultar Histórico';
+            btnConsultar.value = 'Consultar';
             btnConsultar.name = 'BCONSULTAR_OCO';
             btnConsultar.className = btnOriginal.className;
             btnConsultar.style.width = "auto";
@@ -133,7 +133,7 @@
             // Botão Incluir
             const btnIncluir = document.createElement('input');
             btnIncluir.type = 'button';
-            btnIncluir.value = 'Incluir Ocorrência';
+            btnIncluir.value = 'Incluir';
             btnIncluir.name = 'BINCLUIR_OCO';
             btnIncluir.className = btnOriginal.className;
             btnIncluir.style.marginLeft = "10px";
@@ -150,7 +150,7 @@
             // Botão Imprimir
             const btnImprimir = document.createElement('input');
             btnImprimir.type = 'button';
-            btnImprimir.value = 'Imprimir Ficha';
+            btnImprimir.value = 'Imprimir';
             btnImprimir.name = 'BIMPRIMIR_OCO';
             btnImprimir.className = btnOriginal.className;
             btnImprimir.style.marginLeft = "10px";
@@ -248,7 +248,7 @@
         const btnIncluir = document.querySelector('input[name="BINCLUIR_OCO"]');
         const btnOriginal = document.querySelector('input[name="BCONSULTAR"]');
 
-        btnIncluir.value = "Carregando turma...";
+        btnIncluir.value = "Carregando...";
         btnIncluir.disabled = true;
 
         if (btnOriginal) btnOriginal.click();
@@ -265,7 +265,7 @@
             if (rows.length > 0 && !isAjaxLoading) {
                 clearInterval(checkInterval);
 
-                btnIncluir.value = "Incluir Ocorrência";
+                btnIncluir.value = "Incluir";
                 btnIncluir.disabled = false;
 
                 const dados = capturarDadosTela();
@@ -277,7 +277,7 @@
 
             } else if (tentativas >= maxTentativas) {
                 clearInterval(checkInterval);
-                btnIncluir.value = "Incluir Ocorrência";
+                btnIncluir.value = "Incluir";
                 btnIncluir.disabled = false;
                 alert("⏳ Tempo limite excedido ao buscar a turma. Tente novamente.");
             }
@@ -374,7 +374,7 @@
         }
 
         if (!container || container.innerHTML.trim() === '') {
-            alert("⚠️ Consulte o histórico de ocorrências primeiro clicando em 'Consultar Histórico'.");
+            alert("⚠️ Consulte o histórico de ocorrências primeiro clicando em 'Consultar'.");
             return;
         }
 
@@ -544,7 +544,7 @@
             container.innerHTML = `<span style="color:red; font-family:Verdana; font-size:12px;">Erro de conexão: ${err.message}</span>`;
         })
         .finally(() => {
-            btn.value = "Consultar Histórico";
+            btn.value = "Consultar";
             btn.disabled = false;
         });
     }
