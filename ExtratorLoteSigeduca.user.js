@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Envio para Planilha Online - Lote
+// @name         Envio para Planilha Online - Lote (Com Atestados)
 // @namespace    http://tampermonkey.net/
-// @version      2.3
-// @description  Envio das turmas para planilha online e Geração de Impressão em lote.
+// @version      3.1
+// @description  Envio de turmas para planilha online, Geração de Impressão e Extração de Atestados em lote.
 // @author       Elder Martins
 // @match        *://sigeduca.seduc.mt.gov.br/ged/hwmgrhturma.aspx*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js
@@ -12,11 +12,23 @@
 (function() {
     'use strict';
 
-    let urlWebapp = localStorage.getItem('sigeduca_url_webapp') || "";
-    let urlPlanilha = localStorage.getItem('sigeduca_url_planilha') || "";
+    // Padrões de Link atualizados
+    const urlWebAppPadrao = "";
+    const urlPlanilhaPadrao = "";
+
+    let urlWebapp = localStorage.getItem('sigeduca_url_webapp') || urlWebAppPadrao;
+    let urlPlanilha = localStorage.getItem('sigeduca_url_planilha') || urlPlanilhaPadrao;
 
     const pdfjsLib = window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+    // Utilitários
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    function isNotificationHidden(docObject) {
+        var notification = docObject.getElementById('gx_ajax_notification');
+        if (notification) return docObject.defaultView.getComputedStyle(notification).getPropertyValue('display') === 'none';
+        return true;
+    }
 
     let situacoesConhecidas = [
         "AFASTADO POR ABANDONO", "DEPENDENTE", "AFASTADO POR DESISTÊNCIA", "MATRICULADO",
@@ -56,7 +68,8 @@
 
             <select id="acao-lote" style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
                 <option value="imprimir">🖨️ Gerar Impressão Manual</option>
-                <option value="sheets">🚀 Enviar para Planilha Online</option>
+                <option value="sheets">🚀 Enviar Turmas p/ Planilha</option>
+                <option value="atestados">🩺 Extrair Atestados p/ Planilha</option>
             </select>
 
             <button id="btn-iniciar-lote" style="width: 100%; padding: 12px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; opacity: 0.5;" disabled>2. Iniciar Processo 🚀</button>
@@ -68,7 +81,7 @@
         const telaConfig = document.createElement('div');
         telaConfig.style = "width: 340px; padding: 15px; box-sizing: border-box; position: relative; background: #ececec;";
         telaConfig.innerHTML = `
-            <h4 style="margin: 0 0 10px 0; color: #d9534f; font-size: 13px; text-align: center; font-weight: bold;">⚠️ Não altere esses dados sem orientação!</h4>
+            <h4 style="margin: 0 0 10px 0; color: #d9534f; font-size: 13px; text-align: center; font-weight: bold;">⚠️ Configurações de Link</h4>
 
             <label style="font-size: 11px; font-weight: bold; color: #333;">Link da Implantação (Apps Script):</label>
             <input type="text" id="input-webapp-lote" value="${urlWebapp}" style="width: 100%; padding: 6px; margin-bottom: 10px; font-size: 11px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box;">
@@ -112,9 +125,22 @@
         document.getElementById('btn-iniciar-lote').onclick = iniciarProcessoLote;
     }
 
-    function addLog(msg, cor = "#333") {
+    function addLog(msg, cor = "#333", id = null) {
         const logDiv = document.getElementById('log-lote');
-        logDiv.innerHTML = `<div style="color: ${cor}; margin-bottom: 5px;">• ${msg}</div>` + logDiv.innerHTML;
+        if (id) {
+            let exist = document.getElementById(id);
+            if (exist) {
+                exist.innerHTML = `• ${msg}`;
+                exist.style.color = cor;
+                return;
+            }
+        }
+        const newLine = document.createElement('div');
+        newLine.style.color = cor;
+        newLine.style.marginBottom = "5px";
+        if (id) newLine.id = id;
+        newLine.innerHTML = `• ${msg}`;
+        logDiv.prepend(newLine);
     }
 
     function mapearTurmas() {
@@ -163,7 +189,10 @@
     async function iniciarProcessoLote() {
         const acao = document.getElementById('acao-lote').value;
 
-        if (acao === 'sheets' && !urlWebapp) return alert("Erro: Link do Sheets não configurado! Clique na ⚙️ para adicionar.");
+        if ((acao === 'sheets' || acao === 'atestados') && !urlWebapp) {
+            return alert("Erro: Link do Apps Script não configurado! Clique na ⚙️ para adicionar.");
+        }
+
         if (isRodando) return;
         isRodando = true;
 
@@ -174,7 +203,6 @@
         btnIniciar.disabled = true;
         document.getElementById('log-lote').innerHTML = "";
 
-        // Se for impressão, abrimos a janela agora (para o navegador não bloquear por pop-up) e deixamos em espera
         let janelaImpressao = null;
         let htmlGeralImpressao = "";
         if (acao === 'imprimir') {
@@ -207,34 +235,46 @@
 
                 if (alunos.length > 0) {
                     if (acao === 'sheets') {
-                        addLog(`>> ${alunos.length} alunos extraídos. Enviando...`, "#17a2b8");
+                        addLog(`>> ${alunos.length} alunos extraídos. Enviando relação...`, "#17a2b8");
                         await enviarParaSheets(turma.nome, turma.turno, alunos);
-                        addLog(`✅ Salvo na planilha!`, "#28a745");
-                    } else if (acao === 'imprimir') {
+                        addLog(`✅ Relação salva na planilha!`, "#28a745");
+                    }
+                    else if (acao === 'imprimir') {
                         addLog(`>> ${alunos.length} alunos extraídos. Gerando página...`, "#17a2b8");
                         htmlGeralImpressao += gerarHtmlTurma(alunos, turma.nome, turma.turno);
                         addLog(`✅ Página gerada!`, "#28a745");
                     }
+                    else if (acao === 'atestados') {
+                        let logId = "log_atd_" + i;
+                        addLog(`>> Preparando módulo de atestados...`, "#17a2b8", logId);
+                        let atestados = await extrairAtestados(alunos, turma.nome, turma.turno, logId);
+
+                        if (atestados.length > 0) {
+                            addLog(`>> ${atestados.length} atestados coletados. Enviando...`, "#17a2b8", logId);
+                            await enviarAtestadosParaSheets(atestados);
+                            addLog(`✅ ${atestados.length} atestados salvos na planilha!`, "#28a745", logId);
+                        } else {
+                            addLog(`✅ Nenhum atestado encontrado nesta turma.`, "#28a745", logId);
+                        }
+                    }
                 } else {
-                    addLog(`❌ Arquivo vazio.`, "#d9534f");
+                    addLog(`❌ Arquivo vazio ou sem alunos processáveis.`, "#d9534f");
                 }
             } catch (erro) {
                 console.error(erro);
-                addLog(`❌ Falha na leitura (HTML recebido ao invés de PDF).`, "#d9534f");
+                addLog(`❌ Falha na leitura (Erro interno ou resposta HTML bloqueada).`, "#d9534f");
             }
 
-            // Intervalo para não derrubar o Sigeduca
             if (i < turmasMapeadas.length - 1) {
                 await new Promise(r => setTimeout(r, 4000));
             }
         }
 
-        // Finaliza a janela de impressão se foi a opção escolhida
         if (acao === 'imprimir' && janelaImpressao) {
             finalizarJanelaImpressao(janelaImpressao, htmlGeralImpressao);
         }
 
-        btnIniciar.innerHTML = "🎉 Concluído!";
+        btnIniciar.innerHTML = "🎉 Lote Concluído!";
         btnIniciar.style.background = "#28a745";
         btnIniciar.style.color = "white";
         setTimeout(() => resetarBotaoLote(), 3000);
@@ -304,7 +344,7 @@
 
     function enviarParaSheets(turma, turno, alunos) {
         return new Promise((resolve, reject) => {
-            const payload = { turma, turno, alunos };
+            const payload = { tipoIntegracao: "RELACAO", turma, turno, alunos };
             GM_xmlhttpRequest({
                 method: "POST", url: urlWebapp, data: JSON.stringify(payload),
                 headers: { "Content-Type": "application/json" },
@@ -314,7 +354,135 @@
         });
     }
 
-    // --- FUNÇÕES DE IMPRESSÃO (NOVO DESIGN) ---
+    // --- MÓDULO DE ATESTADOS LOTE CORRIGIDO ---
+    function prepararIframeAtestados() {
+        let container = document.getElementById('containerIframeAtestadosLote');
+        // A principal correção: Destruir o Iframe antigo se existir,
+        // garantindo que não aproveitaremos o cache do DOM da turma anterior.
+        if (container) {
+            container.remove();
+        }
+
+        container = document.createElement('div');
+        container.id = 'containerIframeAtestadosLote';
+        container.style.cssText = 'position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; opacity: 0; border: none;';
+        let iframe = document.createElement('iframe');
+        iframe.id = 'iframeAtestadosLote'; iframe.name = 'iframeAtestadosLote';
+        container.appendChild(iframe);
+        document.body.appendChild(container);
+
+        return document.getElementById('iframeAtestadosLote');
+    }
+
+    async function extrairAtestados(alunos, turma, turno, logId) {
+        const iframe = prepararIframeAtestados();
+        iframe.src = 'http://sigeduca.seduc.mt.gov.br/ged/hwmgedatestado.aspx';
+
+        let iframeDoc = iframe.contentWindow.document;
+        let tentativasLoad = 0;
+        while (!iframeDoc.getElementById('vGEDALUCOD') && tentativasLoad < 30) {
+            await delay(1000);
+            iframeDoc = iframe.contentWindow.document;
+            tentativasLoad++;
+        }
+
+        if (tentativasLoad >= 30) throw new Error("Falha ao carregar a tela de atestados do Sigeduca.");
+        await delay(1500);
+
+        let atestadosColetados = [];
+
+        for (let i = 0; i < alunos.length; i++) {
+            if (!isRodando) break;
+            let aluno = alunos[i];
+
+            addLog(`>> Lendo atestados: ${i + 1}/${alunos.length} (${aluno.nome.substring(0,18)}...)`, "#17a2b8", logId);
+
+            let inputAluno = iframeDoc.getElementById('vGEDALUCOD');
+            if (inputAluno) {
+                inputAluno.value = aluno.codigo;
+                if ("createEvent" in iframeDoc) {
+                    var evt = iframeDoc.createEvent("HTMLEvents");
+                    evt.initEvent("change", false, true);
+                    inputAluno.dispatchEvent(evt);
+                } else { inputAluno.fireEvent("onchange"); }
+            } else { continue; }
+
+            await delay(300);
+            let btnConsultar = iframeDoc.getElementsByName('BCONSULTAR')[0] || iframeDoc.querySelector('.btnConsultar');
+            if (btnConsultar) btnConsultar.click();
+            await delay(300);
+
+            while (!isNotificationHidden(iframeDoc)) { await delay(300); }
+
+            let docTabela = iframeDoc;
+            if (iframe.contentWindow.frames.length > 0 && iframe.contentWindow.frames[0].document.getElementById('GriddetalhesContainerTbl')) {
+                docTabela = iframe.contentWindow.frames[0].document;
+            }
+
+            let selectPag = docTabela.getElementById('vPAG');
+            let totalPaginas = selectPag ? selectPag.options.length : 1;
+
+            for (let p = 1; p <= totalPaginas; p++) {
+                if (p > 1 && selectPag) {
+                    selectPag.value = p.toString();
+                    if ("createEvent" in docTabela) {
+                        var evtPag = docTabela.createEvent("HTMLEvents");
+                        evtPag.initEvent("change", false, true);
+                        selectPag.dispatchEvent(evtPag);
+                    } else { selectPag.fireEvent("onchange"); }
+                    try { docTabela.defaultView.gx.evt.execEvt('EVPAG.CLICK.', selectPag); } catch(e){}
+                    await delay(300);
+                    while (!isNotificationHidden(docTabela)) { await delay(300); }
+                }
+
+                let tabelaDetalhes = docTabela.getElementById('GriddetalhesContainerTbl');
+                if (tabelaDetalhes && tabelaDetalhes.rows.length > 1) {
+                    for (let n = 1; n < tabelaDetalhes.rows.length; n++) {
+                        let numStr = ("0000" + n).slice(-4);
+                        try {
+                            let dataIni = docTabela.getElementById('span_vGEDATEPERINI_' + numStr)?.textContent.trim() || '';
+                            let dataFim = docTabela.getElementById('span_vGEDATEPERFIN_' + numStr)?.textContent.trim() || '';
+                            let tipoJust = docTabela.getElementById('span_vGEDATETIPO_' + numStr)?.textContent.trim() || '';
+
+                            if (dataIni) {
+                                let periodoStr = `de ${dataIni} a ${dataFim || dataIni}`;
+                                atestadosColetados.push({
+                                    codigo: aluno.codigo,
+                                    nome: aluno.nome,
+                                    turma: turma,
+                                    turno: turno,
+                                    periodo: periodoStr,
+                                    tipoJustificativa: tipoJust
+                                });
+                            }
+                        } catch (err) {}
+                    }
+                }
+            }
+
+            // Pausa de estabilidade final adicionada igual ao script individual
+            await delay(200);
+        }
+        return atestadosColetados;
+    }
+
+    function enviarAtestadosParaSheets(atestados) {
+        return new Promise((resolve, reject) => {
+            const payload = {
+                tipoIntegracao: "ATESTADOS",
+                abaDestino: "ATESTADOS",
+                dados: atestados
+            };
+            GM_xmlhttpRequest({
+                method: "POST", url: urlWebapp, data: JSON.stringify(payload),
+                headers: { "Content-Type": "application/json" },
+                onload: function(response) { resolve(response); },
+                onerror: function(err) { reject(err); }
+            });
+        });
+    }
+
+    // --- FUNÇÕES DE IMPRESSÃO ---
     function gerarHtmlTurma(alunos, turma, turno) {
         let linhasTabela = "";
         const alunosFiltrados = alunos.filter(a => !a.situacao.toUpperCase().includes("DEPENDENTE"));
@@ -354,7 +522,6 @@
             `;
         }
 
-        // Cada turma vira um bloco div com quebra de página
         return `
             <div class="bloco-turma">
                 <div class="cabecalho-impr">
@@ -389,31 +556,23 @@
                 <title>Lote de Impressão</title>
                 <style>
                     body { font-family: Arial, sans-serif; padding: 15px; color: #333; margin: 0; }
-
-                    /* Quebra de página: Cada turma vai forçar uma folha nova na impressora */
                     .bloco-turma { page-break-after: always; padding-bottom: 20px; }
                     .bloco-turma:last-child { page-break-after: auto; }
-
                     .cabecalho-impr { text-align: center; margin-bottom: 5px; }
                     .cabecalho-impr .titulo { font-size: 10pt; text-transform: uppercase; font-weight: bold; color: #333; }
                     .cabecalho-impr .subtitulo { font-size: 10pt; text-transform: uppercase; color: #333; }
                     .cabecalho-impr .subtitulo b { color: #000; font-weight: bold; }
-
                     table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 7pt; border: 1px solid #000; }
-
                     th { border: none; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 2px; text-transform: uppercase; background-color: #f2f2f2; font-weight: bold; text-align: center; }
                     th:first-child { border-left: 1px solid #000; }
                     th:last-child { border-right: 1px solid #000; }
-
                     td { border: none; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 2px; text-transform: uppercase; }
                     tbody td:nth-child(1), tbody td:nth-child(2) { border-left: 1px solid #000; border-right: 1px solid #000; }
                     td.centro { text-align: center; }
-
                     @media print {
                         .no-print { display: none !important; }
                         body { padding: 0; }
                     }
-
                     .btn-imprimir {
                         display: block; width: 250px; margin: 15px auto; padding: 12px;
                         background: #007bff; color: white; text-align: center;
